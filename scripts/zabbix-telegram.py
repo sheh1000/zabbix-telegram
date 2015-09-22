@@ -1,159 +1,92 @@
 import argparse
-import httplib
-import json
+
 import os
 import sys
 import logging
 import logging.config
 import logging.handlers
 
+from telegram_api import TelegramApi, ServerErrorException
+
 from ConfigParser import ConfigParser
-import urllib
+
+VERSION = '1.0.0'
 
 __author__ = 'Evgeny Lebedev'
 
-CONFIG_FILE = "zabbix-telegram.conf"
-ZABBIX_LOG_FILE = "/var/log/zabbix/zabbix-telegram.log"
+TELEGRAM_API_HOST = 'api.telegram.org'
 
 
-class UserNotFound(Exception):
-    def __init__(self, msg):
-        self.message = msg
+class Application:
+    def __init__(self, opts):
+        self.options = opts
+
+        self.logger = logging.getLogger("logfile")
+
+        self.api_key = None
+        self.target_id = None
+
+        self.configFilePath = 'zabbix-telegram.conf'
+
+        self.compile_config()
+
+    def compile_config(self):
+        # TODO: refactoring required
+        if self.options.configFilePath:
+            self.logger.debug("Configuration file path: %s" % options.configFilePath)
+            if os.path.isfile(self.options.configFilePath):
+                self.configFilePath = self.options.configFilePath
+            else:
+                self.logger.error("Not found")
+                sys.exit(1)
+
+        if os.path.isfile(self.configFilePath):
+            config = ConfigParser()
+            config.read(self.configFilePath)
+
+            telegram_section = 'telegram-bot'
+            allowed_users_section = 'allowed-users'
+
+            if config.has_section(telegram_section):
+                self.api_key = config.get(telegram_section, 'api-key')
+
+                if config.has_section(allowed_users_section):
+                    if config.has_option(allowed_users_section, options.to):
+                        self.target_id = config.get(allowed_users_section, options.to)
+                    else:
+                        raise ValueError('user "%s" not found, check config' % options.to)
+
+        else:
+            self.logger.error("Configuration file not found")
+            sys.exit(1)
 
 
-class ServerErrorException(Exception):
-    def __init__(self, msg):
-        self.message = msg
+if __name__ == '__main__':
+    logging.config.fileConfig('logging.conf')
+    log = logging.getLogger('logfile')
 
+    parser = argparse.ArgumentParser(usage='<to> "<subject>" "<message>"',
+                                     description='Zabbix script for notifications via Telegram Messenger',
+                                     epilog='site: github.com/lebe-dev/zabbix-telegram', version=VERSION)
 
-class TelegramBot:
-    def __init__(self, api_key):
-        self.api_key = api_key
-
-    def getUpdates(self):
-        results = {}
-        #{"ok":true,"result":[{"update_id":349851603,
-        #"message":{"message_id":2,"from":{"id":1448214,"first_name":"Bob","last_name":"Global","username":"bob_global"},
-        # "chat":{"id":1448214,"first_name":"Bob","last_name":"Global","username":"bob_global"},
-        # "date":1442864448,"text":"tettt"}}]}
-
-        users = {}
-
-        try:
-            cnn = httplib.HTTPSConnection("api.telegram.org")
-            cnn.request("GET", "/bot%s/getUpdates" % self.api_key)
-            resp = cnn.getresponse()
-            data = resp.read()
-
-            jsonResponse = json.loads(data)
-            if 'result' in jsonResponse:
-                for responseObject in jsonResponse['result']:
-                    if 'message' in responseObject:
-                        if 'from' in responseObject['message']:
-                            if 'id' in responseObject['message']['from'] and 'username' in responseObject['message']['from']:
-                                users[responseObject['message']['from']['username']] = responseObject['message']['from']['id']
-
-            results = users
-            log.debug('active users:')
-            log.debug(results)
-        except Exception as e:
-            log.error(e.message)
-
-        return results
-
-    def sendMessage(self, target_id, subject, message):
-        try:
-            cnn = httplib.HTTPSConnection("api.telegram.org")
-            params = urllib.urlencode({'chat_id': target_id, 'text': '*subject:* %s\n*message:* %s' % (subject, message), 'parse_mode':'Markdown'})
-            headers = {"Content-type": "application/x-www-form-urlencoded;charset=UTF-8"}
-            cnn.request("POST", "/bot%s/sendMessage" % self.api_key, params, headers)
-
-            response = cnn.getresponse()
-
-            try:
-                server_response = response.read()
-
-                json_data = json.loads(server_response)
-
-                if 'ok' in json_data:
-                    if not json_data['ok'] is True:
-                        raise ServerErrorException("Error response from server: %s" % server_response)
-            except:
-                raise ServerErrorException("Error response from server: %s" % server_response)
-
-        except Exception as e:
-            # TODO: handle exception
-            log.error("Unable to send message: %s" % e.message)
-
-
-def compile_config(args):
-    parser = argparse.ArgumentParser(usage='use: -h for full help',
-                                     description='zabbix script for telegram notifications',
-                                     epilog='site: github.com/lebe-dev/zabbix-telegram')
-
-    parser.add_argument('to', help="telegram username")
+    parser.add_argument('to', help="user alias from configuration file")
     parser.add_argument('subject', help="subject of message")
     parser.add_argument('message', help="text of message")
 
     parser.add_argument("-c", "--config", dest="configFilePath", help="path to configuration file")
 
-    options = parser.parse_args(args[1:])
-
-    print(options.configFilePath)
-
-    api_key = None
-    target_id = None
-
-    configFilePath = CONFIG_FILE
-
-    # TODO: refactoring required
-    if options.configFilePath:
-        if os.path.isfile(options.configFilePath):
-            configFilePath = options.configFilePath
-
-    if os.path.isfile(configFilePath):
-        config = ConfigParser()
-        config.read(configFilePath)
-
-        if config.has_section('telegram-bot'):
-            api_key = config.get('telegram-bot', 'api-key')
-
-            if config.has_section('allowed-users'):
-                if config.has_option('allowed-users', options.to):
-                    target_id = config.get('allowed-users', options.to)
-                else:
-                    raise UserNotFound('user "%s" not found, check config' % options.to)
-
-    else:
-        log.error("Configuration file not found")
-        sys.exit(1)
-
-    return api_key, target_id, options
-
-
-if __name__ == '__main__':
-    logging_handler = logging.handlers.RotatingFileHandler(filename=ZABBIX_LOG_FILE, mode='a', maxBytes=1024,
-                                                           backupCount=1)
-
-    fmt = logging.Formatter('%(asctime)s (%(levelname)s) > %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    logging_handler.setFormatter(fmt)
-
-    logging.Formatter(fmt='%(asctime)s %(message)s')
-
-    log = logging.getLogger(__name__)
-
-    log.addHandler(logging_handler)
-    log.setLevel(logging.DEBUG)
+    options = parser.parse_args(sys.argv[1:])
 
     try:
-        api_key, target_id, options = compile_config(sys.argv)
+        app = Application(options)
 
-        bot = TelegramBot(api_key)
-        bot.getUpdates()
+        api = TelegramApi(TELEGRAM_API_HOST, app.api_key)
 
-        bot.sendMessage(target_id, options.subject, options.message)
+        api.get_updates()
 
-    except UserNotFound as e:
+        api.send_message(app.target_id, options.subject, options.message)
+
+    except ValueError as e:
         log.error(e.message)
 
     except ServerErrorException as e:
