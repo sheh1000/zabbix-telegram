@@ -13,6 +13,7 @@ import urllib
 __author__ = 'Evgeny Lebedev'
 
 CONFIG_FILE = "zabbix-telegram.conf"
+ZABBIX_LOG_FILE = "/var/log/zabbix/zabbix-telegram.log"
 
 
 class UserNotFound(Exception):
@@ -94,14 +95,25 @@ def compile_config(args):
     parser.add_argument('subject', help="subject of message")
     parser.add_argument('message', help="text of message")
 
+    parser.add_argument("-c", "--config", dest="configFilePath", help="path to configuration file")
+
     options = parser.parse_args(args[1:])
+
+    print(options.configFilePath)
 
     api_key = None
     target_id = None
 
-    if os.path.isfile(CONFIG_FILE):
+    configFilePath = CONFIG_FILE
+
+    # TODO: refactoring required
+    if options.configFilePath:
+        if os.path.isfile(options.configFilePath):
+            configFilePath = options.configFilePath
+
+    if os.path.isfile(configFilePath):
         config = ConfigParser()
-        config.read(CONFIG_FILE)
+        config.read(configFilePath)
 
         if config.has_section('telegram-bot'):
             api_key = config.get('telegram-bot', 'api-key')
@@ -112,11 +124,15 @@ def compile_config(args):
                 else:
                     raise UserNotFound('user "%s" not found, check config' % options.to)
 
+    else:
+        log.error("Configuration file not found")
+        sys.exit(1)
+
     return api_key, target_id, options
 
 
 if __name__ == '__main__':
-    logging_handler = logging.handlers.RotatingFileHandler(filename='zabbix-telegram.log', mode='a', maxBytes=1024,
+    logging_handler = logging.handlers.RotatingFileHandler(filename=ZABBIX_LOG_FILE, mode='a', maxBytes=1024,
                                                            backupCount=1)
 
     fmt = logging.Formatter('%(asctime)s (%(levelname)s) > %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -136,6 +152,7 @@ if __name__ == '__main__':
         bot.getUpdates()
 
         bot.sendMessage(target_id, options.subject, options.message)
+
     except UserNotFound as e:
         log.error(e.message)
 
