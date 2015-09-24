@@ -4,10 +4,6 @@ import json
 import logging
 
 
-class ServerErrorException(Exception):
-    pass
-
-
 class TelegramApi:
     def __init__(self, api_host, api_key):
         self.api_host = api_host
@@ -20,16 +16,23 @@ class TelegramApi:
 
         try:
             cnn = httplib.HTTPSConnection(self.api_host)
-            cnn.request(method, "/bot%s/%s" % (self.api_key, command), params, headers)
+            cnn.request(method, self.__compile_url(self.api_key, command), params, headers)
             resp = cnn.getresponse()
             data = resp.read()
             cnn.close()
         except Exception as e:
-            self.logger.error(e.message)
-
-        # TODO: add checks
+            raise IOError(e.message)
 
         return data
+
+    def __compile_url(self, api_key, command):
+        if not api_key:
+            raise ValueError("Invalid api_key value")
+
+        if not command:
+            raise ValueError("Invalid command value")
+
+        return "/bot%s/%s" % (api_key, command)
 
     def get_updates(self):
         results = {}
@@ -37,19 +40,17 @@ class TelegramApi:
         users = {}
 
         try:
-            data = self.__get_request("GET", "getUpdates")
+            response = self.__get_request("GET", "getUpdates")
 
-            if data:
-                # todo: refactoring required
-                json_response = json.loads(data)
-                if 'result' in json_response:
-                    for responseObject in json_response['result']:
-                        if 'message' in responseObject:
-                            if 'from' in responseObject['message']:
-                                if 'id' in responseObject['message']['from'] and 'username' in responseObject['message'][
-                                    'from']:
-                                    users[responseObject['message']['from']['username']] = \
-                                        responseObject['message']['from']['id']
+            if response:
+                data = json.loads(response)
+                try:
+                    if 'result' in data:
+                        for responseObject in data['result']:
+                            message_from = responseObject['message']['from']
+                            users[message_from['username']] = message_from['id']
+                except:
+                    raise ValueError("Invalid response: %s" % response)
 
             results = users
             self.logger.debug('active users:')
@@ -63,8 +64,10 @@ class TelegramApi:
     def send_message(self, target_id, subject, message):
         try:
             params = urllib.urlencode(
-                {'chat_id': target_id, 'text': '*subject:* %s\n*message:* %s' % (subject, message),
-                 'parse_mode': 'Markdown'})
+                {'chat_id': target_id,
+                 'text': '*subject:* %s\n*message:* %s' % (subject, message),
+                 'parse_mode': 'Markdown',
+                 'disable_web_page_preview': 'true'})
 
             headers = {"Content-type": "application/x-www-form-urlencoded;charset=UTF-8"}
 
@@ -75,10 +78,9 @@ class TelegramApi:
 
                 if 'ok' in json_data:
                     if not json_data['ok'] is True:
-                        raise ServerErrorException("Error response from server: %s" % data)
+                        raise ValueError("Invalid response from server: %s" % data)
             except:
-                raise ServerErrorException("Error response from server: %s" % data)
+                raise ValueError("Error response from server: %s" % data)
 
         except Exception as e:
-            # TODO: handle exception
-            self.logger.error("Unable to send message: %s" % e.message)
+            raise IOError("Unable to send message: %s" % e.message)

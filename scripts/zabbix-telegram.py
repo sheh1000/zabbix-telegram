@@ -6,59 +6,60 @@ import logging
 import logging.config
 import logging.handlers
 
-from telegram_api import TelegramApi, ServerErrorException
+from telegram_api import TelegramApi
 
 from ConfigParser import ConfigParser
 
 VERSION = '1.0.0'
 
-__author__ = 'Evgeny Lebedev'
-
 TELEGRAM_API_HOST = 'api.telegram.org'
+
+INVALID_CONFIGURATION_FILE = "Invalid configuration file"
+USER_NOT_FOUND = "User not found"
+
+
+class InvalidConfigurationException(Exception):
+    pass
 
 
 class Application:
-    def __init__(self, opts):
-        self.options = opts
-
+    def __init__(self, config, opts):
         self.logger = logging.getLogger("logfile")
+
+        self.config = config
 
         self.api_key = None
         self.target_id = None
 
-        self.configFilePath = 'zabbix-telegram.conf'
+        self.load_configuration(opts.to)
 
-        self.compile_config()
+    def load_configuration(self, target_user):
+        try:
+            self.api_key = self.config.get('telegram-bot', 'api-key')
+        except:
+            raise InvalidConfigurationException("api-key not found")
 
-    def compile_config(self):
-        # TODO: refactoring required
-        if self.options.configFilePath:
-            self.logger.debug("Configuration file path: %s" % options.configFilePath)
-            if os.path.isfile(self.options.configFilePath):
-                self.configFilePath = self.options.configFilePath
-            else:
-                self.logger.error("Not found")
-                sys.exit(1)
+        try:
+            self.target_id = self.config.get('allowed-users', target_user)
+        except:
+            raise InvalidConfigurationException(INVALID_CONFIGURATION_FILE)
 
-        if os.path.isfile(self.configFilePath):
-            config = ConfigParser()
-            config.read(self.configFilePath)
 
-            telegram_section = 'telegram-bot'
-            allowed_users_section = 'allowed-users'
+def compile_config(config_file_path):
+    if not config_file_path:
+        config_file_path = 'zabbix-telegram.conf'
 
-            if config.has_section(telegram_section):
-                self.api_key = config.get(telegram_section, 'api-key')
+    config = ConfigParser()
 
-                if config.has_section(allowed_users_section):
-                    if config.has_option(allowed_users_section, options.to):
-                        self.target_id = config.get(allowed_users_section, options.to)
-                    else:
-                        raise ValueError('user "%s" not found, check config' % options.to)
+    if os.path.isfile(config_file_path):
+        try:
+            config.read(config_file_path)
+        except:
+            raise IOError("Unable to read from file: %s" % config_file_path)
+    else:
+        raise IOError("Configuration file not found: %s" % config_file_path)
 
-        else:
-            self.logger.error("Configuration file not found")
-            sys.exit(1)
+    return config
 
 
 if __name__ == '__main__':
@@ -67,18 +68,22 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(usage='<to> "<subject>" "<message>"',
                                      description='Zabbix script for notifications via Telegram Messenger',
-                                     epilog='site: github.com/lebe-dev/zabbix-telegram', version=VERSION)
+                                     epilog='site: github.com/lebe-dev/zabbix-telegram')
 
     parser.add_argument('to', help="user alias from configuration file")
     parser.add_argument('subject', help="subject of message")
     parser.add_argument('message', help="text of message")
 
-    parser.add_argument("-c", "--config", dest="configFilePath", help="path to configuration file")
+    parser.add_argument('-v', '--version', action="version", help="show version")
+
+    parser.add_argument("-c", "--config", dest="config_file_path", help="path to configuration file")
 
     options = parser.parse_args(sys.argv[1:])
 
     try:
-        app = Application(options)
+        config = compile_config(options.config_file_path)
+
+        app = Application(config, options)
 
         api = TelegramApi(TELEGRAM_API_HOST, app.api_key)
 
@@ -89,9 +94,8 @@ if __name__ == '__main__':
     except ValueError as e:
         log.error(e.message)
 
-    except ServerErrorException as e:
+    except IOError as e:
         log.error(e.message)
 
-
-
-
+    except InvalidConfigurationException as e:
+        log.error(e.message)
