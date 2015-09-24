@@ -59,3 +59,6 @@ class TestApplication(unittest.TestCase):
         app.config = config
 
         self.assertRaises(self.application_module.InvalidConfigurationException, app.load_configuration, self.opts.to)
+
+if __name__ == '__main__':
+    unittest.main()
