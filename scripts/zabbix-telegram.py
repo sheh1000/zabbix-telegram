@@ -14,7 +14,6 @@ VERSION = '1.0.0'
 
 TELEGRAM_API_HOST = 'api.telegram.org'
 
-INVALID_CONFIGURATION_FILE = "Invalid configuration file"
 USER_NOT_FOUND = "User not found"
 
 
@@ -42,7 +41,7 @@ class Application:
         try:
             self.target_id = self.config.get('allowed-users', target_user)
         except:
-            raise InvalidConfigurationException(INVALID_CONFIGURATION_FILE)
+            raise InvalidConfigurationException("user '%s' not found, check configuration" % target_user)
 
 
 def compile_config(config_file_path):

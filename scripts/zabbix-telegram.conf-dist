@@ -1,0 +1,5 @@
+[telegram-bot]
+api-key=<telegram-api-key>
+
+[allowed-users]
+<zabbix-username>=<telegram-user-id>
