@@ -1,4 +1,4 @@
-script for [Zabbix](http://zabbix.com) notifications via [Telegram messenger](https://telegram.org)
+Send [Zabbix](http://zabbix.com) notifications via [Telegram messenger](https://telegram.org)
 
 ##Requirements##
 
@@ -18,7 +18,7 @@ Note for 2.6:
 
 How to create: https://core.telegram.org/bots
 
-**2. Configuration:**  
+**2. Configuration:**    
 Example of `zabbix-telegram.conf`:
 
 >[telegram-bot]  
@@ -56,15 +56,17 @@ Send to: username
 Enabled: yes  
 
 **3. Configure Zabbix-server**  
+  
 Look /etc/zabbix/zabbix_server.conf for `AlertScriptsPath`  
 Default path: `/usr/lib/zabbix/alertscripts/`
 
-**5.Deploy scripts**  
->cd /usr/lib/zabbix/alertscripts/  
->git clone https://github.com/lebe-dev/zabbix-telegram.git
+**5. Deploy scripts**  
+  
+`cd /usr/lib/zabbix/alertscripts/`    
+`git clone https://github.com/lebe-dev/zabbix-telegram.git`
 
-Required files:
-- zabbix-telegram.py  
+Required files:  
+- zabbix-telegram.py    
 - zabbix-telegram.conf  
 - logging.conf  
 - telegram_api.py  
@@ -75,17 +77,34 @@ Create bash script:
 `#!/bin/bash`  
 `/usr/bin/python /usr/lib/zabbix/alertscripts/telegram.py --config /usr/lib/zabbix/alertscripts/zabbix-telegram.conf $1 "$2" "$3"`
 
-Fix rights:
-
+**6. Fix rights:**  
+  
+`touch /home/zabbix/zabbix-telegram.log`  
+`chmod ug=rw /home/zabbix/zabbix-telegram.log`  
+^ depends on zabbix user home directory (check `/etc/passwd`)  
+`chown -R zabbix.zabbix /usr/lib/zabbix/alertscripts/`
 `chmod +x /usr/lib/zabbix/alertscripts/telegram.sh`  
 `chown -R zabbix.zabbix /usr/lib/zabbix/alertscripts/`   
 
-**6. Create or modify action**
+**7. Create or modify action**
 
 `Zabbix -> Configuration -> Actions -> Create`
 
 "Operations" tab -> select media type `Telegram`
 
+
+##F.A.Q.##
+
+**1. Where can i get telegram user id?**  
+- Write one message at least to your Telegram bot  
+- Set debug level to `DEBUG` (`logging.conf`)  
+- Send trigger notification (action) from zabbix  
+- Check debug.log, you can see picture like this:  
+  
+>2015-09-26 15:41:32,720 DEBUG > active users:  
+>2015-09-26 15:41:32,720 DEBUG > {u'good_fella': 43578235}
+
+`43578235` - is your id
 
 ##Troubleshootings##
 
