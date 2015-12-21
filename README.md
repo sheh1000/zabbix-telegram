@@ -42,7 +42,7 @@ example:
 
 Name: Telegram  
 Type: Script  
-Script name: zabbix-telegram.sh  
+Script name: telegram.sh  
 Enabled: yes  
 
 **2. Configurate zabbix user**
