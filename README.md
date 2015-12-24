@@ -28,7 +28,7 @@ Example of `zabbix-telegram.conf`:
 >zabbix-user-name=telegram user id or chat id
 
 **3. Send message:**  
-- Write one message at least to your Telegram bot
+Telegram user will be able to recieve alerts only after adding Telegram bot in contacts
 
 `zabbix-telegram.py username "subject" "body of message"`
   
