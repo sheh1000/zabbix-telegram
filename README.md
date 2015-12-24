@@ -28,7 +28,7 @@ Example of `zabbix-telegram.conf`:
 >zabbix-user-name=telegram user id or chat id
 
 **3. Send message:**  
-Telegram user should add bot contact in Telegram before accepting alerts.
+- Write one message at least to your Telegram bot
 
 `zabbix-telegram.py username "subject" "body of message"`
   
@@ -98,8 +98,7 @@ Create bash script:
 ##F.A.Q.##
 
 **1. Where can i get telegram user id?**  
-- Add Bot contact in Telegram
-- Write one message at least to your Telegram bot  
+- Write one message at least to your Telegram bot
 - Set debug level to `DEBUG` (`logging.conf`)  
 - Send trigger notification (action) from zabbix  
 - Check debug.log, you can see picture like this:  
