@@ -27,7 +27,7 @@ Example of `zabbix-telegram.conf`:
 >[allowed-users]  
 >zabbix-user-name=telegram user id or chat id
 
-**4. Send message:**  
+**3. Send message:**  
 Telegram user should add bot contact in Telegram before accepting alerts.
 
 `zabbix-telegram.py username "subject" "body of message"`
